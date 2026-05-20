@@ -110,7 +110,7 @@ fi
 ################ Generate script ################
 mkdir -p logs
 
-SCRIPT="logs/${JOB_NAME}.sbatch"
+SCRIPT="logs/${JOB_NAME}-__LAUNCH_CONFIG_NAME__.sbatch"
 
 cat > "$SCRIPT" << 'HEADER'
 #!/bin/bash
