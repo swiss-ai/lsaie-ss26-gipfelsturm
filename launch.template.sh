@@ -98,7 +98,7 @@ if [ -n "$WANDB_API_KEY" ]; then
     TRAINING_CMD="$TRAINING_CMD \
         --wandb-save-dir $LOG_DIR \
         --wandb-project $PROJECT_NAME \
-        --wandb-exp-name $EXP_NAME-$SLURM_JOB_ID"
+        --wandb-exp-name $EXP_NAME-__LAUNCH_CONFIG_NAME__-$SLURM_JOB_ID"
 else
     export WANDB_MODE=disabled
     echo "[$(date)] WANDB disabled."
