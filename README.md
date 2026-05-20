@@ -108,6 +108,14 @@ Training runs on the [Swiss AI Initiative's](https://swiss-ai.org) partition on 
 
 All training is launched via `launch.sh <mode> <model_size> [steps] [nodes]`. The launcher generates a self-contained SLURM script in `logs/` for reproducibility and submits it. Model sizes: 125m, 350m, 760m, 1.5b, 3b, 8b. Nodes default to 4 (max 8).
 
+Launch scripts can be regenerated from `launch.template.sh` with `launch-config.toml`:
+
+```bash
+./generate_launch.py launch-config.toml
+```
+
+By default this writes `launch-config_launch.sh`. Use `--output launch.sh` if you want to overwrite the canonical launcher name. The TOML sections map directly to launcher argument groups such as `TRANSFORMER_ENGINE_ARGS` or `TRAINING_ARGS`. Set a flag to `true` for a boolean switch, to a string/number for `--flag value`, to an array for multi-value flags, or to `false` to remove a flag that already exists in the template.
+
 **Throughput** mode runs 50 steps (by default) to measure tokens/sec/GPU:
 
 ```bash
