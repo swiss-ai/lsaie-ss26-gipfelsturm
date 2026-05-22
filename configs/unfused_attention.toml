@@ -1,0 +1,65 @@
+# Regenerate the launcher with:
+#   ./generate_launch.py launch-config.toml
+#
+# Rules:
+# - `true` adds a boolean flag or keeps an existing one.
+# - `false` removes an existing flag from `launch.template.sh`.
+# - strings / numbers emit `--flag value`.
+# - arrays emit `--flag value1 value2 ...`.
+#
+# Values are written into `launch.sh` verbatim, so shell variables such as
+# "${KV_HEADS}" can be used when needed.
+
+[TRANSFORMER_ENGINE_ARGS]
+# FP8 / Transformer Engine
+# "--fp8-format" = "hybrid"
+# "--fp8-amax-compute-algo" = "max"
+# "--fp8-amax-history-len" = 16
+# "--first-last-layers-bf16" = true
+# "--num-layers-at-start-in-bf16" = 1
+# "--num-layers-at-end-in-bf16" = 1
+# "--apply-rope-fusion" = true
+# "--bias-activation-fusion" = true
+# "--masked-softmax-fusion" = true
+# "--bias-dropout-fusion" = true
+# "--fused-residual-rmsnorm" = true
+# "--use-transformer-engine-op-fuser" = true
+"--attention-backend" = "unfused"
+
+[MIXED_PRECISION_ARGS]
+# "--fp8-format" = "hybrid"
+# "--fp8-amax-compute-algo" = "max"
+# "--fp8-amax-history-len" = 16
+# "--disable-bf16-reduced-precision-matmul" = true
+# "--attention-softmax-in-fp32" = true
+
+[NETWORK_SIZE_ARGS]
+# "--apply-query-key-layer-scaling" = true
+# "--qk-layernorm" = true
+# "--softmax-type" = "vanilla"
+# "--num-query-groups" = 8
+# "--ffn-hidden-size" = 12288
+# "--normalization" = "RMSNorm"
+# "--swiglu" = false
+# "--disable-bias-linear" = true
+# "--rotary-interleaved" = true
+# "--window-size" = [4096, 1024]
+
+[TRAINING_ARGS]
+# "--recompute-granularity" = "selective"
+# "--recompute-method" = "block"
+# "--recompute-num-layers" = 4
+# "--recompute-modules" = ["core_attn"]
+# "--cuda-graph-impl" = "transformer_engine"
+# "--cuda-graph-modules" = ["attn", "mlp"]
+# "--cuda-graph-warmup-steps" = 5
+# "--cuda-graph-use-single-mempool" = true
+
+
+[DISTRIBUTED_ARGS]
+# "--fp8-param-gather" = true
+# "--use-distributed-optimizer" = true
+# "--overlap-grad-reduce" = true
+# "--overlap-param-gather" = true
+# "--tensor-model-parallel-size" = 2
+# "--pipeline-model-parallel-size" = 1
