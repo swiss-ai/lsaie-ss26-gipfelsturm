@@ -63,3 +63,32 @@
 # "--overlap-param-gather" = true
 # "--tensor-model-parallel-size" = 2
 # "--pipeline-model-parallel-size" = 1
+
+
+
+[CHECKPOINT_ARGS]
+#"--save"=  "$CHECKPOINT_PATH"
+#"--save-interval" = "$TRAINING_STEPS"
+#"--ckpt-format" = "torch_dist"
+#"--log-energy" = true
+
+
+[FSDP_ARGS]
+#"--use-megatron-fsdp" = true
+#"--data-parallel-sharding-strategy" = "optim_grads_params"
+#"--ckpt-format fsdp_dtensor" = true
+#"--no-gradient-accumulation-fusion" = true
+#"--init-model-with-meta-device"  = true
+#"--calculate-per-token-loss" = true
+#"--grad-reduce-in-bf16"  = true
+
+[DELTA_GATE_ARGS]
+#"--experimental-attention-variant" = "gated_delta_net"
+#"--linear-attention-freq" = 4
+#"--attention-output-gate"
+#"--qk-layernorm" 
+#"--linear-conv-kernel-dim" = 4
+#"--linear-key-head-dim" = 128
+#"--linear-value-head-dim" = 128
+#"--linear-num-key-heads" = 16
+#"--linear-num-value-heads" = 32

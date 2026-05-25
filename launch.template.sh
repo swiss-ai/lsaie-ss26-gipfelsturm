@@ -292,10 +292,15 @@ TORCHRUN_ARGS=(
 CHECKPOINT_PATH="${SCRATCH}/checkpoints/${JOB_NAME}-${SLURM_JOB_ID}"
 
 CHECKPOINT_ARGS=(
-    --save "$CHECKPOINT_PATH"
-    --save-interval "$TRAINING_STEPS"
-    --ckpt-format torch_dist
-    --log-energy
+
+)
+
+FSDP_ARGS=(
+
+)
+
+DELTA_GATE_ARGS=(
+
 )
 
 TRAINING_CMD="torchrun ${TORCHRUN_ARGS[@]} $MEGATRON_LM_DIR/pretrain_gpt.py \
