@@ -316,7 +316,7 @@ TRAINING_CMD="torchrun ${TORCHRUN_ARGS[@]} $MEGATRON_LM_DIR/pretrain_gpt.py \
     ${TOKENIZER_ARGS[@]} \
     ${CHECKPOINT_ARGS[@]} \
     ${FSDP_ARGS[@]} \
-    ${DELTA_GATE_ARGS[@]} \ 
+    ${DELTA_GATE_ARGS[@]} \
     ${DATA_ARGS[@]}"
 
 TOKENIZER
