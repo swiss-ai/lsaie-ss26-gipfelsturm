@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# Usage: ./launch.sh <mode> <model_size> [steps] [nodes]
+# Usage: ./launch.sh <mode> <model_size> [steps] [nodes] [partition]
 #
 # Modes:     throughput  (50 steps, with W&B)
 #            train       (N steps, with W&B and Tensorboard)
@@ -9,9 +9,11 @@
 #
 # Steps:     required for train mode (e.g., 1000, 5000, 15000)
 # Nodes:     optional, default 4 (max 8)
+# Partition: optional SLURM partition (e.g. "debug"); default unset (cluster default)
 #
 # Examples:  ./launch.sh throughput 760m
 #            ./launch.sh throughput 8b 50 1
+#            ./launch.sh throughput 8b 15 1 debug
 #            ./launch.sh train 760m 5000
 #            ./launch.sh train 1.5b 3000 8
 
@@ -19,8 +21,9 @@ set -euo pipefail
 
 source "$(dirname "$0")/config.sh"
 
-MODE=${1:?Usage: ./launch.sh <mode> <model_size> [steps] [nodes]}
-MODEL_SIZE=${2:?Usage: ./launch.sh <mode> <model_size> [steps] [nodes]}
+MODE=${1:?Usage: ./launch.sh <mode> <model_size> [steps] [nodes] [partition]}
+MODEL_SIZE=${2:?Usage: ./launch.sh <mode> <model_size> [steps] [nodes] [partition]}
+PARTITION=${5:-}
 
 ################ Mode config ################
 case $MODE in
@@ -129,6 +132,10 @@ cat >> "$SCRIPT" << SBATCH_DIRECTIVES
 #SBATCH --mem=460000
 #SBATCH --no-requeue
 SBATCH_DIRECTIVES
+
+if [ -n "${PARTITION}" ]; then
+    echo "#SBATCH --partition=${PARTITION}" >> "$SCRIPT"
+fi
 
 cat >> "$SCRIPT" << 'BODY_HEAD'
 

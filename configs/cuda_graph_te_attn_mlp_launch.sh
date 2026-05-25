@@ -101,7 +101,7 @@ if [ -n "$WANDB_API_KEY" ]; then
     TRAINING_CMD="$TRAINING_CMD \
         --wandb-save-dir $LOG_DIR \
         --wandb-project $PROJECT_NAME \
-        --wandb-exp-name $EXP_NAME-__LAUNCH_CONFIG_NAME__-$SLURM_JOB_ID"
+        --wandb-exp-name $EXP_NAME-cuda_graph_te_attn_mlp-$SLURM_JOB_ID"
 else
     export WANDB_MODE=disabled
     echo "[$(date)] WANDB disabled."
@@ -113,7 +113,7 @@ fi
 ################ Generate script ################
 mkdir -p logs
 
-SCRIPT="logs/${JOB_NAME}-__LAUNCH_CONFIG_NAME__.sbatch"
+SCRIPT="logs/${JOB_NAME}-cuda_graph_te_attn_mlp.sbatch"
 
 cat > "$SCRIPT" << 'HEADER'
 #!/bin/bash
@@ -123,8 +123,8 @@ cat >> "$SCRIPT" << SBATCH_DIRECTIVES
 #SBATCH --account=${SBATCH_ACCOUNT}
 #SBATCH --time=${TIME}
 #SBATCH --job-name=${JOB_NAME}
-#SBATCH --output=logs/%x-__LAUNCH_CONFIG_NAME__-%j.log
-#SBATCH --error=logs/%x-__LAUNCH_CONFIG_NAME__-%j.log
+#SBATCH --output=logs/%x-cuda_graph_te_attn_mlp-%j.log
+#SBATCH --error=logs/%x-cuda_graph_te_attn_mlp-%j.log
 #SBATCH --nodes=${NODES}
 #SBATCH --ntasks-per-node=1
 #SBATCH --gpus-per-node=4
@@ -225,6 +225,10 @@ TRAINING_ARGS=(
     --no-check-for-nan-in-loss-and-grad
     --manual-gc
     --manual-gc-interval 50
+    --cuda-graph-impl transformer_engine
+    --cuda-graph-modules attn mlp
+    --cuda-graph-warmup-steps 5
+    --cuda-graph-use-single-mempool
 )
 
 REGULARIZATION_ARGS=(
