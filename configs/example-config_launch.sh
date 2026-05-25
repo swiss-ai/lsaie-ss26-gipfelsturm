@@ -98,7 +98,7 @@ if [ -n "$WANDB_API_KEY" ]; then
     TRAINING_CMD="$TRAINING_CMD \
         --wandb-save-dir $LOG_DIR \
         --wandb-project $PROJECT_NAME \
-        --wandb-exp-name $EXP_NAME-$SLURM_JOB_ID"
+        --wandb-exp-name $EXP_NAME-example-config-$SLURM_JOB_ID"
 else
     export WANDB_MODE=disabled
     echo "[$(date)] WANDB disabled."
@@ -110,7 +110,7 @@ fi
 ################ Generate script ################
 mkdir -p logs
 
-SCRIPT="logs/${JOB_NAME}.sbatch"
+SCRIPT="logs/${JOB_NAME}-example-config.sbatch"
 
 cat > "$SCRIPT" << 'HEADER'
 #!/bin/bash
@@ -289,6 +289,15 @@ TORCHRUN_ARGS=(
     --tee 3
 )
 
+CHECKPOINT_PATH="${SCRATCH}/checkpoints/${JOB_NAME}-${SLURM_JOB_ID}"
+
+CHECKPOINT_ARGS=(
+    --save "$CHECKPOINT_PATH"
+    --save-interval "$TRAINING_STEPS"
+    --ckpt-format torch_dist
+    --log-energy
+)
+
 TRAINING_CMD="torchrun ${TORCHRUN_ARGS[@]} $MEGATRON_LM_DIR/pretrain_gpt.py \
     ${TRANSFORMER_ENGINE_ARGS[@]} \
     ${NETWORK_SIZE_ARGS[@]} \
@@ -300,6 +309,7 @@ TRAINING_CMD="torchrun ${TORCHRUN_ARGS[@]} $MEGATRON_LM_DIR/pretrain_gpt.py \
     ${DISTRIBUTED_ARGS[@]} \
     ${LOGGING_ARGS[@]} \
     ${TOKENIZER_ARGS[@]} \
+    ${CHECKPOINT_ARGS[@]} \
     ${DATA_ARGS[@]}"
 
 TOKENIZER

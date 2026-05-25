@@ -63,3 +63,5 @@
 # "--overlap-param-gather" = true
 # "--tensor-model-parallel-size" = 2
 # "--pipeline-model-parallel-size" = 1
+
+[CHECKPOINT_ARGS]

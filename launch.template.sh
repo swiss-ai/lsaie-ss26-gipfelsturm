@@ -289,6 +289,15 @@ TORCHRUN_ARGS=(
     --tee 3
 )
 
+CHECKPOINT_PATH="${SCRATCH}/checkpoints/${JOB_NAME}-${SLURM_JOB_ID}"
+
+CHECKPOINT_ARGS=(
+    --save "$CHECKPOINT_PATH"
+    --save-interval "$TRAINING_STEPS"
+    --ckpt-format torch_dist
+    --log-energy
+)
+
 TRAINING_CMD="torchrun ${TORCHRUN_ARGS[@]} $MEGATRON_LM_DIR/pretrain_gpt.py \
     ${TRANSFORMER_ENGINE_ARGS[@]} \
     ${NETWORK_SIZE_ARGS[@]} \
@@ -300,6 +309,7 @@ TRAINING_CMD="torchrun ${TORCHRUN_ARGS[@]} $MEGATRON_LM_DIR/pretrain_gpt.py \
     ${DISTRIBUTED_ARGS[@]} \
     ${LOGGING_ARGS[@]} \
     ${TOKENIZER_ARGS[@]} \
+    ${CHECKPOINT_ARGS[@]} \
     ${DATA_ARGS[@]}"
 
 TOKENIZER
