@@ -27,7 +27,7 @@ case $MODE in
     throughput)
         TRAINING_STEPS=${3:-50}
         NODES=${4:-4}
-        TIME=00:30:00
+        TIME=00:20:00
         EVAL_INTERVAL=$TRAINING_STEPS
         EVAL_ITERS=0
         LR_WARMUP_ITERS=10
@@ -98,7 +98,7 @@ if [ -n "$WANDB_API_KEY" ]; then
     TRAINING_CMD="$TRAINING_CMD \
         --wandb-save-dir $LOG_DIR \
         --wandb-project $PROJECT_NAME \
-        --wandb-exp-name $EXP_NAME-baseline-$SLURM_JOB_ID"
+        --wandb-exp-name $EXP_NAME-gated_delta_net-$SLURM_JOB_ID"
 else
     export WANDB_MODE=disabled
     echo "[$(date)] WANDB disabled."
@@ -110,7 +110,7 @@ fi
 ################ Generate script ################
 mkdir -p logs
 
-SCRIPT="logs/${JOB_NAME}-baseline.sbatch"
+SCRIPT="logs/${JOB_NAME}-gated_delta_net.sbatch"
 
 cat > "$SCRIPT" << 'HEADER'
 #!/bin/bash
@@ -120,15 +120,14 @@ cat >> "$SCRIPT" << SBATCH_DIRECTIVES
 #SBATCH --account=${SBATCH_ACCOUNT}
 #SBATCH --time=${TIME}
 #SBATCH --job-name=${JOB_NAME}
-#SBATCH --output=logs/%x-baseline-%j.log
-#SBATCH --error=logs/%x-baseline-%j.log
+#SBATCH --output=logs/%x-gated_delta_net-%j.log
+#SBATCH --error=logs/%x-gated_delta_net-%j.log
 #SBATCH --nodes=${NODES}
 #SBATCH --ntasks-per-node=1
 #SBATCH --gpus-per-node=4
 #SBATCH --cpus-per-task=288
 #SBATCH --mem=460000
 #SBATCH --no-requeue
-#SBATCH --partition=debug
 SBATCH_DIRECTIVES
 
 cat >> "$SCRIPT" << 'BODY_HEAD'
@@ -182,6 +181,8 @@ TRANSFORMER_ENGINE_ARGS=(
     --transformer-impl transformer_engine
     --use-precision-aware-optimizer
     --main-grads-dtype bf16
+    --experimental-attention-variant gated_delta_net
+    --linear-attention-freq 4
 )
 
 SETUP
@@ -304,7 +305,10 @@ DELTA_GATE_ARGS=(
 
 )
 
-TRAINING_CMD="torchrun ${TORCHRUN_ARGS[@]} $MEGATRON_LM_DIR/pretrain_gpt.py \
+TRAINING_CMD="
+    pip install flash-linear-attention && \
+    pip install tilelang && \
+    torchrun ${TORCHRUN_ARGS[@]} $MEGATRON_LM_DIR/pretrain_gpt.py \
     ${TRANSFORMER_ENGINE_ARGS[@]} \
     ${NETWORK_SIZE_ARGS[@]} \
     ${TRAINING_ARGS[@]} \
@@ -316,6 +320,8 @@ TRAINING_CMD="torchrun ${TORCHRUN_ARGS[@]} $MEGATRON_LM_DIR/pretrain_gpt.py \
     ${LOGGING_ARGS[@]} \
     ${TOKENIZER_ARGS[@]} \
     ${CHECKPOINT_ARGS[@]} \
+    ${FSDP_ARGS[@]} \
+    ${DELTA_GATE_ARGS[@]} \
     ${DATA_ARGS[@]}"
 
 TOKENIZER

@@ -61,7 +61,7 @@ case $MODEL_SIZE in
         ;;
     350m)
         NUM_LAYERS=24; HIDDEN=1024; FFN=2816;  HEADS=16; KV_HEADS=4
-        MBS=1
+        MBS=8
         ;;
     760m)
         NUM_LAYERS=24; HIDDEN=1536; FFN=4096;  HEADS=16; KV_HEADS=4
@@ -86,7 +86,7 @@ case $MODEL_SIZE in
 esac
 
 GBS=256
-SEQ_LEN=1024
+SEQ_LEN=4096
 JOB_NAME="gipfel-${MODE}-${MODEL_SIZE}-${TRAINING_STEPS}s-${NODES}n"
 
 ################ W&B block ################
@@ -98,7 +98,7 @@ if [ -n "$WANDB_API_KEY" ]; then
     TRAINING_CMD="$TRAINING_CMD \
         --wandb-save-dir $LOG_DIR \
         --wandb-project $PROJECT_NAME \
-        --wandb-exp-name $EXP_NAME-baseline-$SLURM_JOB_ID"
+        --wandb-exp-name $EXP_NAME-dsa-$SLURM_JOB_ID"
 else
     export WANDB_MODE=disabled
     echo "[$(date)] WANDB disabled."
@@ -110,7 +110,7 @@ fi
 ################ Generate script ################
 mkdir -p logs
 
-SCRIPT="logs/${JOB_NAME}-baseline.sbatch"
+SCRIPT="logs/${JOB_NAME}-dsa.sbatch"
 
 cat > "$SCRIPT" << 'HEADER'
 #!/bin/bash
@@ -120,8 +120,8 @@ cat >> "$SCRIPT" << SBATCH_DIRECTIVES
 #SBATCH --account=${SBATCH_ACCOUNT}
 #SBATCH --time=${TIME}
 #SBATCH --job-name=${JOB_NAME}
-#SBATCH --output=logs/%x-baseline-%j.log
-#SBATCH --error=logs/%x-baseline-%j.log
+#SBATCH --output=logs/%x-dsa-%j.log
+#SBATCH --error=logs/%x-dsa-%j.log
 #SBATCH --nodes=${NODES}
 #SBATCH --ntasks-per-node=1
 #SBATCH --gpus-per-node=4
@@ -182,6 +182,8 @@ TRANSFORMER_ENGINE_ARGS=(
     --transformer-impl transformer_engine
     --use-precision-aware-optimizer
     --main-grads-dtype bf16
+    --experimental-attention-variant dsa
+    --no-rope-fusion
 )
 
 SETUP
@@ -192,8 +194,16 @@ NETWORK_SIZE_ARGS=(
     --hidden-size ${HIDDEN}
     --ffn-hidden-size ${FFN}
     --num-attention-heads ${HEADS}
-    --group-query-attention
-    --num-query-groups ${KV_HEADS}
+    --multi-latent-attention
+    --q-lora-rank 1536
+    --kv-lora-rank 512
+    --qk-head-dim 128
+    --qk-pos-emb-head-dim 64
+    --v-head-dim 128
+    --dsa-indexer-n-heads 4
+    --dsa-indexer-head-dim 128
+    --dsa-indexer-topk 64
+    --dsa-indexer-loss-coeff 0.0
     --max-position-embeddings \$SEQ_LEN
     --position-embedding-type rope
     --normalization RMSNorm
@@ -316,6 +326,8 @@ TRAINING_CMD="torchrun ${TORCHRUN_ARGS[@]} $MEGATRON_LM_DIR/pretrain_gpt.py \
     ${LOGGING_ARGS[@]} \
     ${TOKENIZER_ARGS[@]} \
     ${CHECKPOINT_ARGS[@]} \
+    ${FSDP_ARGS[@]} \
+    ${DELTA_GATE_ARGS[@]} \
     ${DATA_ARGS[@]}"
 
 TOKENIZER
@@ -332,7 +344,55 @@ WANDB_INSERT
 cat >> "$SCRIPT" << 'FOOTER'
 
 echo "CMD: $TRAINING_CMD"
-srun -lu --mpi=pmix --network=disable_rdzv_get --environment=alps3 --cpus-per-task $SLURM_CPUS_PER_TASK --wait 60 bash -c "numactl --membind=0-3 $TRAINING_CMD"
+
+srun -lu --mpi=pmix --network=disable_rdzv_get --environment=alps3 \
+  --cpus-per-task $SLURM_CPUS_PER_TASK --wait 60 \
+  bash -lc '
+    set -euo pipefail
+
+    export PY_DEPS=/iopsstor/scratch/cscs/$USER/gipfelsturm/python_deps/site
+    mkdir -p "$PY_DEPS"
+
+    export PYTHONPATH="$PY_DEPS:${PYTHONPATH:-}"
+    export PIP_TARGET="$PY_DEPS"
+
+    echo "=== INSIDE SRUN / CONTAINER ==="
+    echo "python=$(which python)"
+    echo "pip=$(which pip || true)"
+
+    python - <<PY
+import sys
+print("sys.executable:", sys.executable)
+import torch
+print("torch:", torch.__version__)
+print("cuda:", torch.version.cuda)
+print("torch cuda available:", torch.cuda.is_available())
+PY
+
+    echo "nvcc=$(which nvcc || true)"
+    nvcc -V || true
+
+    python -m pip install --upgrade --target "$PY_DEPnumactlS" packaging ninja wheel setuptools
+
+    flock "$PY_DEPS/.fast_hadamard_install.lock" bash -lc '"'"'
+      set -e
+      export PY_DEPS=/iopsstor/scratch/cscs/$USER/gipfelsturm/python_deps/site
+      export PYTHONPATH="$PY_DEPS:${PYTHONPATH:-}"
+      export PIP_TARGET="$PY_DEPS"
+
+      python - <<PY || python -m pip install -v --no-build-isolation --target "$PY_DEPS" git+https://github.com/Dao-AILab/fast-hadamard-transform.git
+import fast_hadamard_transform
+print("fast_hadamard_transform already installed")
+PY
+    '"'"'
+
+    python - <<PY
+import fast_hadamard_transform
+print("fast_hadamard_transform import OK")
+PY
+
+    numactl --membind=0-3 '"$TRAINING_CMD"'
+  '
 
 echo "END TIME: $(date)"
 FOOTER

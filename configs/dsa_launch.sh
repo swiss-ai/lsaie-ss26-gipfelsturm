@@ -73,7 +73,7 @@ case $MODEL_SIZE in
         ;;
     3b)
         NUM_LAYERS=32; HIDDEN=3072; FFN=8192;  HEADS=24; KV_HEADS=8
-        MBS=4
+        MBS=2
         ;;
     8b)
         NUM_LAYERS=32; HIDDEN=4096; FFN=14336; HEADS=32; KV_HEADS=8
@@ -98,7 +98,7 @@ if [ -n "$WANDB_API_KEY" ]; then
     TRAINING_CMD="$TRAINING_CMD \
         --wandb-save-dir $LOG_DIR \
         --wandb-project $PROJECT_NAME \
-        --wandb-exp-name $EXP_NAME-baseline-$SLURM_JOB_ID"
+        --wandb-exp-name $EXP_NAME-dsa-$SLURM_JOB_ID"
 else
     export WANDB_MODE=disabled
     echo "[$(date)] WANDB disabled."
@@ -110,7 +110,7 @@ fi
 ################ Generate script ################
 mkdir -p logs
 
-SCRIPT="logs/${JOB_NAME}-baseline.sbatch"
+SCRIPT="logs/${JOB_NAME}-dsa.sbatch"
 
 cat > "$SCRIPT" << 'HEADER'
 #!/bin/bash
@@ -120,8 +120,8 @@ cat >> "$SCRIPT" << SBATCH_DIRECTIVES
 #SBATCH --account=${SBATCH_ACCOUNT}
 #SBATCH --time=${TIME}
 #SBATCH --job-name=${JOB_NAME}
-#SBATCH --output=logs/%x-baseline-%j.log
-#SBATCH --error=logs/%x-baseline-%j.log
+#SBATCH --output=logs/%x-dsa-%j.log
+#SBATCH --error=logs/%x-dsa-%j.log
 #SBATCH --nodes=${NODES}
 #SBATCH --ntasks-per-node=1
 #SBATCH --gpus-per-node=4
@@ -182,6 +182,8 @@ TRANSFORMER_ENGINE_ARGS=(
     --transformer-impl transformer_engine
     --use-precision-aware-optimizer
     --main-grads-dtype bf16
+    --experimental-attention-variant dsa
+    --no-rope-fusion
 )
 
 SETUP
@@ -192,8 +194,16 @@ NETWORK_SIZE_ARGS=(
     --hidden-size ${HIDDEN}
     --ffn-hidden-size ${FFN}
     --num-attention-heads ${HEADS}
-    --group-query-attention
-    --num-query-groups ${KV_HEADS}
+    --multi-latent-attention
+    --q-lora-rank 1536
+    --kv-lora-rank 512
+    --qk-head-dim 128
+    --qk-pos-emb-head-dim 64
+    --v-head-dim 128
+    --dsa-indexer-n-heads 4
+    --dsa-indexer-head-dim 128
+    --dsa-indexer-topk 16
+    --dsa-indexer-loss-coeff 0.0
     --max-position-embeddings \$SEQ_LEN
     --position-embedding-type rope
     --normalization RMSNorm
@@ -304,7 +314,9 @@ DELTA_GATE_ARGS=(
 
 )
 
-TRAINING_CMD="torchrun ${TORCHRUN_ARGS[@]} $MEGATRON_LM_DIR/pretrain_gpt.py \
+TRAINING_CMD="
+    pip install --no-build-isolation --no-cache-dir "git+https://github.com/Dao-AILab/fast-hadamard-transform.git" && \
+    torchrun ${TORCHRUN_ARGS[@]} $MEGATRON_LM_DIR/pretrain_gpt.py \
     ${TRANSFORMER_ENGINE_ARGS[@]} \
     ${NETWORK_SIZE_ARGS[@]} \
     ${TRAINING_ARGS[@]} \
@@ -316,6 +328,8 @@ TRAINING_CMD="torchrun ${TORCHRUN_ARGS[@]} $MEGATRON_LM_DIR/pretrain_gpt.py \
     ${LOGGING_ARGS[@]} \
     ${TOKENIZER_ARGS[@]} \
     ${CHECKPOINT_ARGS[@]} \
+    ${FSDP_ARGS[@]} \
+    ${DELTA_GATE_ARGS[@]} \
     ${DATA_ARGS[@]}"
 
 TOKENIZER

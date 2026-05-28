@@ -61,7 +61,7 @@ case $MODEL_SIZE in
         ;;
     350m)
         NUM_LAYERS=24; HIDDEN=1024; FFN=2816;  HEADS=16; KV_HEADS=4
-        MBS=8
+        MBS=1
         ;;
     760m)
         NUM_LAYERS=24; HIDDEN=1536; FFN=4096;  HEADS=16; KV_HEADS=4
@@ -86,7 +86,7 @@ case $MODEL_SIZE in
 esac
 
 GBS=256
-SEQ_LEN=4096
+SEQ_LEN=1024
 JOB_NAME="gipfel-${MODE}-${MODEL_SIZE}-${TRAINING_STEPS}s-${NODES}n"
 
 ################ W&B block ################
@@ -128,6 +128,7 @@ cat >> "$SCRIPT" << SBATCH_DIRECTIVES
 #SBATCH --cpus-per-task=288
 #SBATCH --mem=460000
 #SBATCH --no-requeue
+#SBATCH --partition=debug
 SBATCH_DIRECTIVES
 
 cat >> "$SCRIPT" << 'BODY_HEAD'
@@ -290,6 +291,20 @@ TORCHRUN_ARGS=(
     --tee 3
 )
 
+CHECKPOINT_PATH="${SCRATCH}/checkpoints/${JOB_NAME}-${SLURM_JOB_ID}"
+
+CHECKPOINT_ARGS=(
+
+)
+
+FSDP_ARGS=(
+
+)
+
+DELTA_GATE_ARGS=(
+
+)
+
 TRAINING_CMD="torchrun ${TORCHRUN_ARGS[@]} $MEGATRON_LM_DIR/pretrain_gpt.py \
     ${TRANSFORMER_ENGINE_ARGS[@]} \
     ${NETWORK_SIZE_ARGS[@]} \
@@ -301,6 +316,9 @@ TRAINING_CMD="torchrun ${TORCHRUN_ARGS[@]} $MEGATRON_LM_DIR/pretrain_gpt.py \
     ${DISTRIBUTED_ARGS[@]} \
     ${LOGGING_ARGS[@]} \
     ${TOKENIZER_ARGS[@]} \
+    ${CHECKPOINT_ARGS[@]} \
+    ${FSDP_ARGS[@]} \
+    ${DELTA_GATE_ARGS[@]} \
     ${DATA_ARGS[@]}"
 
 TOKENIZER
